@@ -9,6 +9,384 @@
     --bg: #0f172a; --surface: #1e293b; --card: #334155;
     --accent: #6366f1; --accent-hover: #818cf8; --green: #22c55e;
     --text: #f1f5f9; --muted: #94a3b8; --border: #475569;
+    --selected: #6366f1; --voted-bg: #22c55e22; --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  header {
+    width: 100%; padding: 20px; text-align: center;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+  header h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+  #join-screen {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; padding: 60px 20px; flex: 1;
+  }
+  #join-screen h2 { font-size: 1.3rem; }
+  #join-screen input {
+    padding: 12px 16px; font-size: 1rem; border-radius: 10px;
+    border: 2px solid var(--border); background: var(--surface);
+    color: var(--text); width: 280px; outline: none; text-align: center;
+  }
+  #join-screen input:focus { border-color: var(--accent); }
+  #join-screen .error { color: var(--red); font-size: 0.85rem; }
+  .host-key-section {
+    margin-top: 8px; padding: 16px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    text-align: center; max-width: 320px;
+  }
+  .host-key-section label {
+    font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;
+  }
+  .host-key-section input { width: 140px; letter-spacing: 0.2em; }
+  .waiting-msg {
+    color: var(--muted); font-size: 0.9rem; padding: 12px;
+    background: var(--surface); border-radius: 10px; border: 1px solid var(--border);
+    display: none; text-align: center; max-width: 320px; line-height: 1.5;
+  }
+  .waiting-msg.show { display: block; }
+  .btn {
+    padding: 12px 28px; font-size: 1rem; font-weight: 600;
+    border: none; border-radius: 10px; cursor: pointer;
+    background: var(--accent); color: #fff; transition: all 0.15s;
+  }
+  .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: var(--card); }
+  .btn.secondary:hover { background: var(--border); }
+  .btn.green { background: var(--green); }
+  .btn.green:hover { background: #16a34a; }
+  .btn.red { background: var(--red); }
+  .btn.red:hover { background: #dc2626; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  #game-screen { display: none; width: 100%; max-width: 800px; padding: 24px 16px; flex: 1; }
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 10px;
+  }
+  .status-bar .name-tag {
+    background: var(--surface); padding: 6px 14px; border-radius: 8px;
+    font-size: 0.85rem; color: var(--muted);
+  }
+  .status-bar .name-tag strong { color: var(--text); }
+  .host-badge {
+    background: var(--accent); color: #fff; font-size: 0.7rem;
+    padding: 2px 8px; border-radius: 4px; margin-left: 6px;
+    text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;
+  }
+  .cards-section h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .cards {
+    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    margin-bottom: 32px;
+  }
+  .card {
+    width: 72px; height: 100px; display: flex; align-items: center;
+    justify-content: center; font-size: 1.5rem; font-weight: 700;
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 12px; cursor: pointer; transition: all 0.15s;
+    user-select: none;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-4px); }
+  .card.selected {
+    background: var(--accent); border-color: var(--accent);
+    color: #fff; transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(99,102,241,0.3);
+  }
+  .voters-section { margin-top: 8px; }
+  .voters-section h3 {
+    font-size: 0.9rem; color: var(--muted); margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .voter-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .voter {
+    width: 110px; padding: 16px 8px; border-radius: 12px;
+    background: var(--surface); border: 2px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    transition: all 0.3s;
+  }
+  .voter.has-voted { border-color: var(--green); background: var(--voted-bg); }
+  .voter-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--card); display: flex; align-items: center;
+    justify-content: center; font-size: 1.1rem; font-weight: 700;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .voter-name {
+    font-size: 0.8rem; color: var(--muted); text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    width: 100%;
+  }
+  .voter-vote {
+    font-size: 1.4rem; font-weight: 800; min-height: 28px;
+    display: flex; align-items: center;
+  }
+  .voter-vote .hidden-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+  }
+  .results-summary {
+    margin-top: 24px; padding: 20px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: none;
+  }
+  .results-summary.show { display: block; }
+  .results-summary h3 { font-size: 1rem; margin-bottom: 12px; }
+  .results-row {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    font-size: 0.95rem; border-bottom: 1px solid var(--border);
+  }
+  .results-row:last-child { border-bottom: none; }
+  .results-label { color: var(--muted); }
+  .results-value { font-weight: 700; }
+  .host-controls {
+    display: flex; gap: 12px; justify-content: center;
+    margin-top: 28px; flex-wrap: wrap;
+  }
+  #ended-screen {
+    display: none; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; padding: 60px 20px; flex: 1;
+  }
+  #ended-screen h2 { font-size: 1.3rem; }
+  #ended-screen p { color: var(--muted); }
+  @media (max-width: 500px) {
+    .card { width: 58px; height: 82px; font-size: 1.2rem; }
+    .voter { width: 90px; padding: 12px 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>&#127183;</span> Pointing Poker</h1>
+  <div class="subtitle">Fibonacci Estimation</div>
+</header>
+<div id="join-screen">
+  <h2>Enter your name to join</h2>
+  <input id="name-input" type="text" placeholder="Your name" maxlength="20" autofocus>
+  <div class="host-key-section">
+    <label>If you are the host, enter the key:</label>
+    <input id="host-key-input" type="text" placeholder="Host key" maxlength="10">
+  </div>
+  <div class="error" id="join-error"></div>
+  <div class="waiting-msg" id="waiting-msg">No host has started a session yet. Enter the host key above to start one, or wait for the host to join.</div>
+  <button class="btn" id="join-btn">Join Session</button>
+</div>
+<div id="game-screen">
+  <div class="status-bar">
+    <div class="name-tag">Logged in as <strong id="my-name"></strong><span class="host-badge" id="host-badge" style="display:none">Host</span></div>
+    <div class="name-tag" id="voter-count">0 voters</div>
+  </div>
+  <div class="cards-section">
+    <h3>Pick your estimate</h3>
+    <div class="cards" id="cards"></div>
+  </div>
+  <div class="voters-section">
+    <h3>Team Votes</h3>
+    <div class="voter-grid" id="voter-grid"></div>
+  </div>
+  <div class="results-summary" id="results-summary">
+    <h3>Results</h3>
+    <div id="results-body"></div>
+  </div>
+  <div class="host-controls" id="host-controls" style="display:none">
+    <button class="btn green" id="reveal-btn">Reveal Votes</button>
+    <button class="btn secondary" id="reset-btn">New Round</button>
+    <button class="btn red" id="end-btn">End Session</button>
+  </div>
+</div>
+<div id="ended-screen">
+  <h2>Session Ended</h2>
+  <p>The host has ended this session.</p>
+  <button class="btn" id="rejoin-btn">Back to Join Screen</button>
+</div>
+<script>
+const FIBONACCI = ['1','2','3','5','8','13','21','?'];
+let myId = null;
+let myVote = null;
+let isHost = false;
+let state = { voters: [], revealed: false, hostId: null, sessionActive: false };
+let eventSource = null;
+const cardsEl = document.getElementById('cards');
+FIBONACCI.forEach(val => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.textContent = val;
+  card.addEventListener('click', () => castVote(val));
+  cardsEl.appendChild(card);
+});
+document.getElementById('join-btn').addEventListener('click', join);
+document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+document.getElementById('host-key-input').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+document.getElementById('rejoin-btn').addEventListener('click', () => {
+  document.getElementById('ended-screen').style.display = 'none';
+  document.getElementById('join-screen').style.display = 'flex';
+  document.getElementById('join-error').textContent = '';
+  document.getElementById('waiting-msg').classList.remove('show');
+});
+async function join() {
+  const name = document.getElementById('name-input').value.trim();
+  const hostKey = document.getElementById('host-key-input').value.trim();
+  if (!name) return;
+  document.getElementById('join-error').textContent = '';
+  document.getElementById('waiting-msg').classList.remove('show');
+  const res = await fetch('/join', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, hostKey })
+  });
+  const data = await res.json();
+  if (data.error) {
+    if (data.error.includes('Waiting for host')) {
+      document.getElementById('waiting-msg').classList.add('show');
+    } else {
+      document.getElementById('join-error').textContent = data.error;
+    }
+    return;
+  }
+  myId = data.id;
+  isHost = data.isHost;
+  document.getElementById('my-name').textContent = name;
+  document.getElementById('join-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'block';
+  connectSSE();
+}
+function connectSSE() {
+  if (eventSource) { eventSource.close(); }
+  eventSource = new EventSource('/events?id=' + myId);
+  eventSource.addEventListener('state', e => {
+    state = JSON.parse(e.data);
+    render();
+  });
+  eventSource.addEventListener('ended', () => {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    myId = null; myVote = null; isHost = false;
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('ended-screen').style.display = 'flex';
+  });
+  eventSource.onerror = () => {
+    if (eventSource) eventSource.close();
+    setTimeout(() => { if (myId) connectSSE(); }, 2000);
+  };
+}
+async function castVote(val) {
+  if (state.revealed) return;
+  const vote = (myVote === val) ? null : val;
+  await fetch('/vote', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: myId, vote })
+  });
+  myVote = vote;
+  renderCards();
+}
+document.getElementById('reveal-btn').addEventListener('click', async () => {
+  await fetch('/reveal', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: myId })
+  });
+});
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  await fetch('/reset', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: myId })
+  });
+  myVote = null;
+  renderCards();
+});
+document.getElementById('end-btn').addEventListener('click', async () => {
+  if (confirm('End the session? This will kick everyone out.')) {
+    await fetch('/end', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: myId })
+    });
+  }
+});
+function render() {
+  isHost = (state.hostId === myId);
+  document.getElementById('host-badge').style.display = isHost ? 'inline' : 'none';
+  document.getElementById('host-controls').style.display = isHost ? 'flex' : 'none';
+  document.getElementById('voter-count').textContent = state.voters.length + ' voter' + (state.voters.length !== 1 ? 's' : '');
+  if (!state.revealed) {
+    const me = state.voters.find(v => v.id === myId);
+    if (me && !me.voted) { myVote = null; }
+  }
+  renderCards();
+  renderVoters();
+  renderResults();
+}
+function renderCards() {
+  document.querySelectorAll('.card').forEach((card, i) => {
+    card.classList.toggle('selected', FIBONACCI[i] === myVote);
+  });
+}
+function renderVoters() {
+  const grid = document.getElementById('voter-grid');
+  grid.innerHTML = '';
+  state.voters.forEach(v => {
+    const el = document.createElement('div');
+    el.className = 'voter' + (v.voted ? ' has-voted' : '');
+    const initial = v.name.charAt(0);
+    el.innerHTML =
+      '<div class="voter-avatar">' + initial + '</div>' +
+      '<div class="voter-name">' + esc(v.name) + (v.id === state.hostId ? ' <span class="host-badge">Host</span>' : '') + '</div>' +
+      '<div class="voter-vote">' +
+        (state.revealed
+          ? (v.vote !== null ? esc(v.vote) : '\u2013')
+          : (v.voted ? '<div class="hidden-dot"></div>' : '')) +
+      '</div>';
+    grid.appendChild(el);
+  });
+}
+function renderResults() {
+  const box = document.getElementById('results-summary');
+  const body = document.getElementById('results-body');
+  if (!state.revealed) { box.classList.remove('show'); return; }
+  const numericVotes = state.voters
+    .filter(v => v.vote !== null && v.vote !== '?')
+    .map(v => parseInt(v.vote));
+  if (numericVotes.length === 0) {
+    box.classList.add('show');
+    body.innerHTML = '<div class="results-row"><span class="results-label">No numeric votes cast</span></div>';
+    return;
+  }
+  const avg = (numericVotes.reduce((a,b) => a+b, 0) / numericVotes.length).toFixed(1);
+  const sorted = [...numericVotes].sort((a,b) => a-b);
+  const median = sorted.length % 2 === 0
+    ? ((sorted[sorted.length/2 - 1] + sorted[sorted.length/2]) / 2).toFixed(1)
+    : sorted[Math.floor(sorted.length/2)];
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const agree = new Set(numericVotes).size === 1;
+  body.innerHTML =
+    '<div class="results-row"><span class="results-label">Average</span><span class="results-value">' + avg + '</span></div>' +
+    '<div class="results-row"><span class="results-label">Median</span><span class="results-value">' + median + '</span></div>' +
+    '<div class="results-row"><span class="results-label">Range</span><span class="results-value">' + min + ' \u2013 ' + max + '</span></div>' +
+    '<div class="results-row"><span class="results-label">Consensus</span><span class="results-value">' + (agree ? '\u2705 Yes!' : '\u274C No') + '</span></div>';
+  box.classList.add('show');
+}
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+window.addEventListener('beforeunload', () => {
+  if (myId) navigator.sendBeacon('/leave', JSON.stringify({ id: myId }));
+});
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pointing Poker</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --accent: #6366f1; --accent-hover: #818cf8; --green: #22c55e;
+    --text: #f1f5f9; --muted: #94a3b8; --border: #475569;
     --selected: #6366f1; --voted-bg: #22c55e22;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
