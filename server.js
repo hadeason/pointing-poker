@@ -9,20 +9,20 @@ const HOST_KEY = process.env.HOST_KEY || '0723';
 // ---------- Estimation scales ----------
 const SCALES = {
   fibonacci:   { label: 'Story Points (Fibonacci)', values: ['1','2','3','5','8','13','21','?'], numeric: true },
-  tshirt:      { label: 'T-Shirt Sizes',            values: ['XS','S','M','L','XL','XXL','?'],   numeric: false,
-                 order: { XS:1, S:2, M:3, L:4, XL:5, XXL:6 } },
+  tshirt:      { label: 'T-Shirt Sizes',            values: ['XS','S','M','L','XL','XXL','XXXL','?'], numeric: false,
+                 order: { XS:1, S:2, M:3, L:4, XL:5, XXL:6, XXXL:7 } },
   days:        { label: 'Days',                     values: ['0.5','1','2','3','5','8','13','?'], numeric: true },
-  weeks:       { label: 'Weeks',                    values: ['0.5','1','2','3','4','6','?'],      numeric: true },
-  headache:    { label: 'Headache Level',           values: ['😀','🙂','😐','😟','😫','🤯','?'],
+  weeks:       { label: 'Weeks',                    values: ['0.5','1','2','3','4','6','8','?'], numeric: true },
+  headache:    { label: 'Headache Level',           values: ['😀','🙂','😐','😟','😫','😵','🤯','?'],
                  numeric: false,
-                 order: { '😀':1,'🙂':2,'😐':3,'😟':4,'😫':5,'🤯':6 } },
-  oneToTen:    { label: 'Scale of 1-10',            values: ['1','2','3','4','5','6','7','8','9','10','?'], numeric: true },
-  goodThings:  { label: 'Scale of Good Things',     values: ['☕','🍪','🍰','🍕','🌮','🏖️','?'],
+                 order: { '😀':1,'🙂':2,'😐':3,'😟':4,'😫':5,'😵':6,'🤯':7 } },
+  oneToTen:    { label: 'Scale of 1-10',            values: ['1','2','3','4','5','6','7','8','9','10'], numeric: true },
+  goodThings:  { label: 'Scale of Good Things',     values: ['☕','🍪','🍰','🍕','🌮','🍷','🏖️','?'],
                  numeric: false,
-                 order: { '☕':1, '🍪':2, '🍰':3, '🍕':4, '🌮':5, '🏖️':6 } },
-  blastRadius: { label: 'Blast Radius',             values: ['👤','👥','🏢','🌆','🌎','💥','?'],
+                 order: { '☕':1, '🍪':2, '🍰':3, '🍕':4, '🌮':5, '🍷':6, '🏖️':7 } },
+  blastRadius: { label: 'Blast Radius',             values: ['👤','👥','🏢','🌆','🌎','🌌','💥','?'],
                  numeric: false,
-                 order: { '👤':1, '👥':2, '🏢':3, '🌆':4, '🌎':5, '💥':6 } },
+                 order: { '👤':1, '👥':2, '🏢':3, '🌆':4, '🌎':5, '🌌':6, '💥':7 } },
 };
 
 const VALID_ROLES = new Set(['junior', 'mid', 'senior', 'other']);
@@ -126,7 +126,8 @@ function pickDefenders() {
   const voted = Object.entries(voters)
     .filter(([, v]) => v.vote !== null && v.vote !== '?')
     .map(([id, v]) => ({ id, role: v.role }));
-  if (voted.length === 0) return [];
+  // Skip defender picking entirely when the group is too small to defend.
+  if (voted.length < 3) return [];
   const byRole = { junior: [], mid: [], senior: [] };
   voted.forEach(v => { if (byRole[v.role]) byRole[v.role].push(v); });
   for (const r of Object.keys(byRole)) {
@@ -146,22 +147,25 @@ function pickDefenders() {
 }
 
 function checkSeniorConsensus() {
-  const seniors = Object.values(voters).filter(v => v.role === 'senior');
-  if (seniors.length < 2) return null;
-  const votes = seniors.map(v => v.vote).filter(x => x !== null && x !== '?');
-  if (votes.length !== seniors.length) return null;
-  const first = votes[0];
-  if (votes.every(x => x === first)) return first;
-  return null;
+  // Counts only seniors who actually cast a vote. Need at least 2 voting seniors
+  // who agree on the same non-'?' value.
+  const seniorVotes = Object.values(voters)
+    .filter(v => v.role === 'senior' && v.vote !== null && v.vote !== '?')
+    .map(v => v.vote);
+  if (seniorVotes.length < 2) return null;
+  const first = seniorVotes[0];
+  return seniorVotes.every(x => x === first) ? first : null;
 }
 
 function checkTeamConsensus() {
-  const all = Object.values(voters).filter(v => v.vote !== null && v.vote !== '?');
-  if (all.length < 2) return null;
-  if (all.length !== Object.keys(voters).length) return null;
-  const first = all[0].vote;
-  if (all.every(v => v.vote === first)) return first;
-  return null;
+  // Team consensus = everyone who voted picked the same non-'?' value.
+  // Voters who didn't vote are ignored (per user spec).
+  const votes = Object.values(voters)
+    .filter(v => v.vote !== null && v.vote !== '?')
+    .map(v => v.vote);
+  if (votes.length < 2) return null;
+  const first = votes[0];
+  return votes.every(x => x === first) ? first : null;
 }
 
 function detectDiscrepancy() {
@@ -265,20 +269,20 @@ function buildSessionSummary() {
   };
 }
 
-function revealAndMaybeAccept({ auto = false, accepted = null, wasSeniorConsensus = false } = {}) {
+function reveal() {
   if (revealed) return;
   revealed = true;
   defenders = pickDefenders();
+  const senior = checkSeniorConsensus();
   const team = checkTeamConsensus();
-  if (auto && wasSeniorConsensus) {
-    lastReaction = { type: 'senior-consensus', at: Date.now(), value: accepted };
+  if (senior) {
+    // Senior consensus locks in the estimate (per original spec).
+    lastReaction = { type: 'senior-consensus', at: Date.now(), value: senior };
+    recordRound(senior, true, !!team);
   } else if (team) {
     lastReaction = { type: 'consensus', at: Date.now() };
   } else if (detectDiscrepancy()) {
     lastReaction = { type: 'discrepancy', at: Date.now() };
-  }
-  if (auto && accepted != null) {
-    recordRound(accepted, wasSeniorConsensus, !!team);
   }
   broadcast('state', getState());
 }
@@ -351,16 +355,13 @@ const server = http.createServer((req, res) => {
         if (revealed) return json({ error: 'Round already revealed' });
         voters[id].vote = vote;
         broadcast('state', getState());
-        const seniorVal = checkSeniorConsensus();
-        if (seniorVal != null) {
-          revealAndMaybeAccept({ auto: true, accepted: seniorVal, wasSeniorConsensus: true });
-        }
+        // Consensus is only evaluated on /reveal (per user spec) — no mid-vote surprise reveal.
         return json({ ok: true });
       }
 
       if (url.pathname === '/reveal') {
         if (data.id !== hostId) return json({ error: 'Only the host can reveal' });
-        revealAndMaybeAccept({ auto: false });
+        reveal();
         return json({ ok: true });
       }
 

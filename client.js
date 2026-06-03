@@ -208,6 +208,8 @@
     var scale = state.scales[state.scale];
     if (!scale) { cardsEl.innerHTML = ''; return; }
     var values = scale.values;
+    // Force exactly 2 rows: ceil(N/2) columns.
+    cardsEl.style.setProperty('--cols', Math.ceil(values.length / 2));
     // Rebuild if values changed
     var current = Array.from(cardsEl.querySelectorAll('.card')).map(function (c) { return c.dataset.val; });
     var same = current.length === values.length && current.every(function (v, i) { return v === values[i]; });
@@ -383,7 +385,7 @@
     if (r.type === 'consensus' || r.type === 'senior-consensus') {
       fireConfetti(r.type === 'senior-consensus' ? 80 : 140);
     } else if (r.type === 'discrepancy') {
-      fireSadFaces(24);
+      fireAlarm(20);
     }
   }
 
@@ -404,16 +406,22 @@
     }
   }
 
-  function fireSadFaces(count) {
+  function fireAlarm(count) {
     var layer = $('particle-layer');
-    var faces = ['😢', '😞', '😔', '🥲', '😟', '😭'];
+    var icons = ['🚨', '🆘', '⚠️', '💔', '😢', '😞', '😔', '😭'];
+    // Red border flash on the screen
+    var flash = document.createElement('div');
+    flash.className = 'alarm-flash';
+    document.body.appendChild(flash);
+    setTimeout(function () { flash.remove(); }, 1800);
+    // Falling alarm icons + sad faces
     for (var i = 0; i < count; i++) {
       var p = document.createElement('div');
-      p.className = 'particle';
-      p.textContent = faces[Math.floor(Math.random() * faces.length)];
+      p.className = 'particle alarm';
+      p.textContent = icons[Math.floor(Math.random() * icons.length)];
       p.style.left = (Math.random() * 100) + 'vw';
-      p.style.top = (-30 - Math.random() * 60) + 'px';
-      p.style.animationDuration = (2.4 + Math.random() * 1.2) + 's';
+      p.style.top = (-40 - Math.random() * 80) + 'px';
+      p.style.animationDuration = (2.0 + Math.random() * 1.2) + 's';
       p.style.animationDelay = (Math.random() * 0.4) + 's';
       layer.appendChild(p);
       setTimeout(function (el) { return function () { el.remove(); }; }(p), 4000);
