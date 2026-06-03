@@ -391,7 +391,7 @@
 
   function fireConfetti(count) {
     var layer = $('particle-layer');
-    var colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#0ea5e9', '#f43f5e', '#a78bfa'];
+    var colors = ['#43b458', '#7bca8a', '#0c1416', '#5a6b6e', '#d8e2e0', '#132229', '#38a04a'];
     for (var i = 0; i < count; i++) {
       var p = document.createElement('div');
       p.className = 'particle confetti';
