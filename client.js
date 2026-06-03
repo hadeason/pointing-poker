@@ -247,11 +247,12 @@
       } else {
         voteHtml = v.voted ? '<div class="hidden-dot"></div>' : '';
       }
-      var hostTag = v.isHost ? ' <span class="host-badge">Host</span>' : '';
+      var hostRow = v.isHost ? '<div class="voter-host-row"><span class="host-badge">Host</span></div>' : '';
       var roleTag = '<span class="role-badge ' + esc(v.role) + '">' + fmtRole(v.role) + '</span>';
       el.innerHTML =
         '<div class="voter-avatar">' + esc(initial) + '</div>' +
-        '<div class="voter-name">' + esc(v.name) + hostTag + '</div>' +
+        '<div class="voter-name">' + esc(v.name) + '</div>' +
+        hostRow +
         '<div class="badges">' + roleTag + '</div>' +
         '<div class="voter-vote">' + voteHtml + '</div>';
       if (isHost) {
