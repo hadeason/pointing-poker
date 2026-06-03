@@ -206,17 +206,17 @@ header h1 .accent { color: var(--accent); }
 }
 .cards {
   display: grid;
-  grid-template-columns: repeat(var(--cols, 4), 72px);
-  grid-auto-rows: 100px;
-  gap: 12px;
-  justify-content: center;
+  grid-template-columns: repeat(var(--cols, 4), 104px);
+  grid-auto-rows: 140px;
+  gap: 14px;
+  justify-content: start;
   margin-bottom: 32px;
 }
 .card {
   display: flex; align-items: center;
-  justify-content: center; font-size: 1.4rem; font-weight: 500;
+  justify-content: center; font-size: 1.9rem; font-weight: 500;
   background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 12px; cursor: pointer; transition: all 0.15s;
+  border-radius: 14px; cursor: pointer; transition: all 0.15s;
   user-select: none;
   color: var(--text);
   box-shadow: var(--shadow-sm);
@@ -269,8 +269,16 @@ header h1 .accent { color: var(--accent); }
 }
 .voter-name {
   font-size: 0.8rem; color: var(--muted); text-align: center;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* Wrap long names rather than truncate */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
   width: 100%;
+}
+.voter-host-row {
+  display: flex;
+  justify-content: center;
+  margin-top: -2px;
 }
 .voter-vote {
   font-size: 1.4rem; font-weight: 600; min-height: 28px;
@@ -411,8 +419,20 @@ header h1 .accent { color: var(--accent); }
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
 }
+@media (max-width: 700px) {
+  .cards {
+    grid-template-columns: repeat(var(--cols, 4), 84px);
+    grid-auto-rows: 116px;
+    gap: 10px;
+  }
+  .card { font-size: 1.5rem; border-radius: 12px; }
+}
 @media (max-width: 500px) {
-  .card { width: 58px; height: 82px; font-size: 1.2rem; }
+  .cards {
+    grid-template-columns: repeat(var(--cols, 4), 68px);
+    grid-auto-rows: 96px;
+    gap: 8px;
+  }
+  .card { font-size: 1.3rem; border-radius: 10px; }
   .voter { width: 95px; padding: 12px 6px; }
-  .cards { grid-auto-rows: 82px; grid-template-columns: repeat(var(--cols, 4), 58px); }
 }
