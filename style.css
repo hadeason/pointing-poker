@@ -230,7 +230,7 @@ header h1 .accent { color: var(--accent); }
 
 /* ---------- Voters ---------- */
 .voters-section { margin-top: 8px; }
-.voter-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.voter-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
 .voter {
   width: 180px; padding: 16px 12px; border-radius: 12px;
   background: var(--card); border: 1.5px solid var(--border);
