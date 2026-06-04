@@ -52,6 +52,22 @@
   $('join-btn').addEventListener('click', join);
   $('name-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
   $('host-key-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+  $('claim-host-btn').addEventListener('click', claimHost);
+  $('claim-host-key').addEventListener('keydown', function (e) { if (e.key === 'Enter') claimHost(); });
+
+  function claimHost() {
+    var key = $('claim-host-key').value.trim();
+    if (!key) return;
+    $('claim-host-error').textContent = '';
+    post('/claim-host', { id: myId, hostKey: key }).then(function (data) {
+      if (data && data.error) {
+        $('claim-host-error').textContent = data.error;
+        return;
+      }
+      $('claim-host-key').value = '';
+    });
+  }
+
   $('rejoin-btn').addEventListener('click', function () {
     $('ended-screen').style.display = 'none';
     $('join-screen').style.display = 'flex';
@@ -107,9 +123,12 @@
       $('ended-screen').style.display = 'flex';
       renderSummary(payload.summary || null, payload.history || []);
     });
+    var retryDelay = 2000;
     eventSource.onerror = function () {
       if (eventSource) eventSource.close();
-      setTimeout(function () { if (myId) connectSSE(); }, 2000);
+      // Cap exponential backoff at 8s so reconnect stays snappy on flaky links.
+      setTimeout(function () { if (myId) connectSSE(); }, retryDelay);
+      retryDelay = Math.min(retryDelay * 1.5, 8000);
     };
   }
 
@@ -161,6 +180,9 @@
   // ---------- render ----------
   function render() {
     isHost = (state.hostId === myId);
+    var hostMissing = !state.hostId;
+    $('claim-host-banner').classList.toggle('show', hostMissing && !!myId);
+    if (!hostMissing) $('claim-host-error').textContent = '';
     $('host-badge').style.display = isHost ? 'inline' : 'none';
     $('host-controls').style.display = isHost ? 'flex' : 'none';
     $('host-tips').style.display = isHost ? 'block' : 'none';
@@ -376,6 +398,31 @@
     $('avg-round-time').textContent = fmtDuration(avg);
     $('team-consensus-count').textContent = String(history.filter(function (r) { return r.teamConsensus; }).length);
     $('senior-consensus-count').textContent = String(history.filter(function (r) { return r.seniorConsensus; }).length);
+    renderLeaderboard();
+  }
+
+  function renderLeaderboard() {
+    var card = $('leaderboard-card');
+    var list = $('leaderboard-list');
+    if (!card || !list) return;
+    var lb = (state.leaderboard || []).slice().sort(function (a, b) {
+      return (b.accuracy - a.accuracy) || (b.matched - a.matched);
+    });
+    if (!lb.length) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+    list.innerHTML = '';
+    lb.forEach(function (e) {
+      var row = document.createElement('div');
+      row.className = 'leaderboard-row';
+      row.innerHTML =
+        '<span class="lb-name" title="' + esc(e.name) + '">' + esc(e.name) + '</span>' +
+        '<span class="lb-fraction">' + e.matched + '/' + e.picked + '</span>' +
+        '<span class="lb-acc">' + e.accuracy + '%</span>';
+      list.appendChild(row);
+    });
   }
 
   // ---------- reactions: confetti + sad faces ----------
@@ -468,6 +515,29 @@
         '</div>';
       perWrap.appendChild(card);
     });
+
+    var lb = (summary.leaderboard || []).slice().sort(function (a, b) {
+      return (b.accuracy - a.accuracy) || (b.matched - a.matched);
+    });
+    var lbWrap = $('leaderboard-summary');
+    var lbList = $('leaderboard-summary-list');
+    if (lbWrap && lbList) {
+      if (lb.length) {
+        lbWrap.style.display = 'block';
+        lbList.innerHTML = '';
+        lb.forEach(function (e) {
+          var row = document.createElement('div');
+          row.className = 'leaderboard-row';
+          row.innerHTML =
+            '<span class="lb-name" title="' + esc(e.name) + '">' + esc(e.name) + '</span>' +
+            '<span class="lb-fraction">' + e.matched + ' of ' + e.picked + ' rounds matched</span>' +
+            '<span class="lb-acc">' + e.accuracy + '%</span>';
+          lbList.appendChild(row);
+        });
+      } else {
+        lbWrap.style.display = 'none';
+      }
+    }
 
     (summary.rounds || []).forEach(function (r) {
       var tr = document.createElement('tr');
