@@ -38,6 +38,12 @@
 <div id="game-screen">
   <div class="layout">
     <div class="layout-main">
+      <div id="claim-host-banner" class="claim-host-banner">
+        <span class="msg"><strong>No host on this session.</strong> Enter the host key to claim:</span>
+        <input id="claim-host-key" type="text" placeholder="Host key" maxlength="20">
+        <button class="btn green small" id="claim-host-btn">Claim Host</button>
+        <span class="error" id="claim-host-error"></span>
+      </div>
       <div class="status-bar">
         <div class="name-tag">
           Logged in as <strong id="my-name"></strong>
@@ -97,8 +103,12 @@
       <div class="sidebar-card" id="host-tips" style="display:none">
         <h4>Host Tips</h4>
         <div style="font-size:0.8rem;color:var(--muted);line-height:1.5">
-          Click any voter to call on them. Pulsing border = called on (amber) or random defender (rose).
+          Click any voter to call on them. Pulsing border = called on (black) or random defender (gray).
         </div>
+      </div>
+      <div class="sidebar-card" id="leaderboard-card" style="display:none">
+        <h4>Leaderboard</h4>
+        <div id="leaderboard-list"></div>
       </div>
     </aside>
   </div>
@@ -110,6 +120,10 @@
   <p id="ended-blurb">Here's how the session went.</p>
   <div class="summary-grid" id="summary-tiles"></div>
   <div id="per-scale-wrap"></div>
+  <div class="per-scale leaderboard-summary" id="leaderboard-summary" style="display:none">
+    <h4>Leaderboard (estimate accuracy)</h4>
+    <div id="leaderboard-summary-list"></div>
+  </div>
   <div style="width:100%;overflow-x:auto">
     <table class="round-table" id="round-table">
       <thead>

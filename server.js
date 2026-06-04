@@ -42,6 +42,93 @@ let roundStartedAt = null;
 let sessionStartedAt = null;
 let history = [];
 let currentRoundRecorded = false;
+let leaderboard = {}; // name -> { name, picked, matched }
+const sseClientCount = new Map(); // voterId -> active SSE connection count
+const pendingRemoval = new Map(); // voterId -> setTimeout handle
+
+function scheduleRemoval(id) {
+  if (pendingRemoval.has(id)) return;
+  const t = setTimeout(() => {
+    pendingRemoval.delete(id);
+    if ((sseClientCount.get(id) || 0) === 0) removeVoter(id);
+  }, 45000);
+  pendingRemoval.set(id, t);
+}
+function cancelRemoval(id) {
+  const t = pendingRemoval.get(id);
+  if (t) { clearTimeout(t); pendingRemoval.delete(id); }
+}
+function updateLeaderboardForRound(estimate) {
+  if (estimate == null || estimate === '?') return;
+  for (const v of Object.values(voters)) {
+    if (v.vote == null || v.vote === '?') continue;
+    const key = v.name;
+    if (!leaderboard[key]) leaderboard[key] = { name: v.name, picked: 0, matched: 0 };
+    leaderboard[key].picked += 1;
+    if (String(v.vote) === String(estimate)) leaderboard[key].matched += 1;
+  }
+}
+function leaderboardArray() {
+  return Object.values(leaderboard)
+    .map(e => ({
+      name: e.name,
+      picked: e.picked,
+      matched: e.matched,
+      accuracy: e.picked > 0 ? Math.round((e.matched / e.picked) * 100) : 0,
+    }))
+    .sort((a, b) => (b.accuracy - a.accuracy) || (b.matched - a.matched));
+}
+
+function postStats(summary) {
+  // Always log a compact line so it's visible in Render logs.
+  try {
+    console.log('[stats]', JSON.stringify({
+      app: 'pointing-poker',
+      at: new Date().toISOString(),
+      totalMs: summary.totalMs,
+      totalRounds: summary.totalRounds,
+      teamConsensus: summary.totalTeamConsensus,
+      seniorConsensus: summary.totalSeniorConsensus,
+      leaderboard: summary.leaderboard,
+    }));
+  } catch {}
+  const webhookUrl = process.env.STATS_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  try {
+    const u = new URL(webhookUrl);
+    const lib = u.protocol === 'https:' ? require('https') : require('http');
+    const body = JSON.stringify({
+      app: 'pointing-poker',
+      version: 1,
+      timestamp: new Date().toISOString(),
+      summary: {
+        totalMs: summary.totalMs,
+        totalRounds: summary.totalRounds,
+        totalTeamConsensus: summary.totalTeamConsensus,
+        totalSeniorConsensus: summary.totalSeniorConsensus,
+        perScale: summary.perScale,
+        leaderboard: summary.leaderboard,
+        rounds: process.env.STATS_INCLUDE_ROUNDS ? summary.rounds : undefined,
+      },
+    });
+    const req = lib.request({
+      method: 'POST',
+      host: u.hostname,
+      port: u.port || (u.protocol === 'https:' ? 443 : 80),
+      path: u.pathname + (u.search || ''),
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'pointing-poker/1.0',
+      },
+    });
+    req.on('error', err => console.error('[stats] webhook error:', err.message));
+    req.write(body);
+    req.end();
+  } catch (e) {
+    console.error('[stats] webhook send failed:', e.message);
+  }
+}
 
 function broadcast(event, data) {
   const msg = 'event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n';
@@ -75,6 +162,7 @@ function getState() {
     roundStartedAt,
     sessionStartedAt,
     history,
+    leaderboard: leaderboardArray(),
   };
 }
 
@@ -84,10 +172,14 @@ function removeVoter(id) {
   delete voters[id];
   calledOn.delete(id);
   defenders = defenders.filter(d => d !== id);
+  cancelRemoval(id);
+  sseClientCount.delete(id);
   if (wasHost) {
-    const remaining = Object.entries(voters).sort((a, b) => b[1].joinedAt - a[1].joinedAt);
-    hostId = remaining.length ? remaining[0][0] : null;
-    if (!hostId) sessionActive = false;
+    // No auto-fallback: the next host must re-enter the host key via /claim-host
+    hostId = null;
+  }
+  if (Object.keys(voters).length === 0) {
+    sessionActive = false;
   }
   broadcast('state', getState());
 }
@@ -105,6 +197,7 @@ function startNewRound() {
 
 function endSession() {
   const summary = buildSessionSummary();
+  try { postStats(summary); } catch (e) { console.error('postStats threw:', e); }
   const finalHistory = history;
   voters = {};
   revealed = false;
@@ -116,6 +209,11 @@ function endSession() {
   roundStartedAt = null;
   sessionStartedAt = null;
   history = [];
+  leaderboard = {};
+  // Clear all pending removal timers
+  for (const t of pendingRemoval.values()) clearTimeout(t);
+  pendingRemoval.clear();
+  sseClientCount.clear();
   broadcast('ended', { summary, history: finalHistory });
   sseClients.forEach(res => { try { res.end(); } catch {} });
   sseClients = [];
@@ -210,6 +308,7 @@ function recordRound(acceptedEstimate, wasSeniorConsensus, wasTeamConsensus) {
     seniorConsensus: !!wasSeniorConsensus,
     teamConsensus: !!wasTeamConsensus,
   });
+  updateLeaderboardForRound(acceptedEstimate);
 }
 
 function buildSessionSummary() {
@@ -265,6 +364,7 @@ function buildSessionSummary() {
     totalSeniorConsensus,
     totalTeamConsensus,
     perScale,
+    leaderboard: leaderboardArray(),
     rounds: history,
   };
 }
@@ -305,16 +405,30 @@ const server = http.createServer((req, res) => {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
-    res.write('\n');
+    res.write('retry: 3000\n\n');
     sseClients.push(res);
-    if (voterId) clientVoterMap.set(res, voterId);
+    if (voterId) {
+      clientVoterMap.set(res, voterId);
+      sseClientCount.set(voterId, (sseClientCount.get(voterId) || 0) + 1);
+      cancelRemoval(voterId);
+    }
     res.write('event: state\ndata: ' + JSON.stringify(getState()) + '\n\n');
     req.on('close', () => {
       sseClients = sseClients.filter(c => c !== res);
       const vid = clientVoterMap.get(res);
       clientVoterMap.delete(res);
-      if (vid) removeVoter(vid);
+      if (vid) {
+        const n = (sseClientCount.get(vid) || 1) - 1;
+        if (n <= 0) {
+          sseClientCount.delete(vid);
+          // Grace period: only remove if no reconnect within 45s.
+          scheduleRemoval(vid);
+        } else {
+          sseClientCount.set(vid, n);
+        }
+      }
     });
     return;
   }
@@ -435,6 +549,18 @@ const server = http.createServer((req, res) => {
         return json({ ok: true });
       }
 
+      if (url.pathname === '/claim-host') {
+        const { id, hostKey } = data;
+        if (!voters[id]) return json({ error: 'Unknown voter' });
+        if ((hostKey || '').trim() !== HOST_KEY) return json({ error: 'Invalid host key' });
+        hostId = id;
+        if (!sessionActive) sessionActive = true;
+        if (!sessionStartedAt) sessionStartedAt = Date.now();
+        if (!roundStartedAt) roundStartedAt = Date.now();
+        broadcast('state', getState());
+        return json({ ok: true });
+      }
+
       if (url.pathname === '/status') {
         return json({ sessionActive, hasHost: !!hostId });
       }
@@ -452,3 +578,12 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log('Pointing Poker running on port ' + PORT);
 });
+
+// Send a comment line every 20s to keep SSE connections alive across
+// idle proxies (Render's edge etc.). The colon-prefix is the SSE
+// comment syntax — clients ignore it.
+setInterval(() => {
+  sseClients = sseClients.filter(res => {
+    try { res.write(': keepalive\n\n'); return true; } catch { return false; }
+  });
+}, 20000);
